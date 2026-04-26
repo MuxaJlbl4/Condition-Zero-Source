@@ -1,0 +1,113 @@
+"Dust"
+{
+	"map"		"de_dust; hostname Condition_Zero"
+	"image"		"maps/de_dust.tga"
+	"comment"	"Prevent Terrorists from bombing chemical weapon crates. Team members must defuse any bombs that threaten targeted areas."
+}
+"Office"
+{
+	"map"		"cs_office; hostname Condition_Zero"
+	"image"		"maps/cs_office.tga"
+	"comment"	"Enter the office building and rescue the hostages. Take out the Terrorists without jeopardizing the hostages."
+}
+"Prodigy"
+{
+	"map"		"de_prodigy; hostname Condition_Zero"
+	"image"		"maps/de_prodigy.tga"
+	"comment"	"Prevent Terrorists from bombing the computer lab or the fuel pipeline control room. Team members must defuse any bombs that threaten targeted areas."
+}
+
+"Tides"
+{
+	"map"		"de_tides; hostname Condition_Zero"
+	"image"		"maps/de_tides.tga"
+	"comment"	"Prevent the Terrorists from detonating their bomb."
+}
+"Italy"
+{
+	"map"		"cs_italy; hostname Condition_Zero"
+	"image"		"maps/cs_italy.tga"
+	"comment"	"Navigate your way around the Italian city and get those Hostages from the foreign Terrorists."
+}
+"Inferno"
+{
+	"map"		"de_inferno; hostname Condition_Zero"
+	"image"		"maps/de_inferno.tga"
+	"comment"	"Prevent the terrorists from destroying either one of the bomb targets."
+}
+
+"Dust II"
+{
+	"map"		"de_dust2; hostname Condition_Zero"
+	"image"		"maps/de_dust2.tga"
+	"comment"	"Prevent Terrorists from bombing chemical weapon crates. Team members must defuse any bombs that threaten targeted areas."
+}
+"Militia"
+{
+	"map"		"cs_militia; hostname Condition_Zero"
+	"image"		"maps/cs_militia.tga"
+	"comment"	"The whereabouts of a militia group that kidnapped four individuals last week has been disclosed by one of our informants. Enter the militia hideout and rescue the hostages or eliminate the terrorist threat entirely."
+}
+"Trainyard"
+{
+	"map"		"de_train; hostname Condition_Zero"
+	"image"		"maps/de_train.tga"
+	"comment"	"Prevent Terrorists from bombing the chemical payloads on two trains. Team members must defuse any bombs that threaten the payloads."
+}
+
+"Chateau"
+{
+	"map"		"de_chateau; hostname Condition_Zero"
+	"image"		"maps/de_chateau.tga"
+	"comment"	"Protect Lord William's investment and prevent the Terrorists from destroying his new home."
+}
+"Havana"
+{
+	"map"		"cs_havana; hostname Condition_Zero"
+	"image"		"maps/cs_havana.tga"
+	"comment"	"You have control of the perimeter and must now rescue all of the surviving hostages before the terrorists manage to escape."
+}
+"Cobblestone"
+{
+	"map"		"de_cbble; hostname Condition_Zero"
+	"image"		"maps/de_cbble.tga"
+	"comment"	"Prevent Terrorists from bombing Lord William's country farmhouse. He has been the target of assassination in light of recent government proposals."
+}
+
+"Aztec"
+{
+	"map"		"de_aztec; hostname Condition_Zero"
+	"image"		"maps/de_aztec.tga"
+	"comment"	"Prevent the Terrorists bombing the archeological site."
+}
+"Compound"
+{
+	"map"		"cs_compound; hostname Condition_Zero"
+	"image"		"maps/cs_compound.tga"
+	"comment"	"Inside this remote industrial compound, terrorists hold three captives: scientists with critical information on America's secret weapons program. They must not be harmed!"
+}
+"Рort"
+{
+	"map"		"de_port; hostname Condition_Zero"
+	"image"		"maps/de_port.tga"
+	"comment"	"Rebel separatists seek to disrupt economically-vital shipping operations along the northern coast. They must not succeed!"
+}
+
+"Piranesi"
+{
+	"map"		"de_piranesi; hostname Condition_Zero"
+	"image"		"maps/de_piranesi.tga"
+	"comment"	"Protect the historical site against the terrorists."
+}
+"Assault"
+{
+	"map"		"cs_assault; hostname Condition_Zero"
+	"image"		"maps/cs_assault.tga"
+	"comment"	"Enter the Terrorist stronghold and rescue the hostages. Take out the Terrorists without jeopardizing the hostages."
+}
+"Nuke"
+{
+	"map"		"de_nuke; hostname Condition_Zero"
+	"image"		"maps/de_nuke.tga"
+	"comment"	"A silent alarm has been tripped by the guard shack at the MAC Nuclear Power Plant. We will enter from the back side of the plant and secure the area."
+}
