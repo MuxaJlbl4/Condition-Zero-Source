@@ -2,7 +2,6 @@
 #define MyAppVersion "1.0"
 #define MyAppPublisher "Miishanya"
 #define MyAppURL "https://github.com/MuxaJlbl4/Condition-Zero-Source"
-#define MyUninstallName "Condition Zero: Source"
 
 [Setup]
 AppName={#MyAppName}
@@ -19,7 +18,7 @@ OutputBaseFilename=Condition-Zero-Source-{#MyAppVersion}
 Compression=lzma
 SolidCompression=yes
 Uninstallable=yes
-UninstallDisplayName={#MyUninstallName}
+UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\czero.ico
 WizardStyle=modern
 WizardImageFile=Images/insecure.bmp

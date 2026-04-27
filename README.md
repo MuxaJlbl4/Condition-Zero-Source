@@ -1,8 +1,12 @@
 # ![Title](Images/header.png)
 
-Singleplayer and cooperative PvE mod for **Counter-Strike: Source**, powered by [SourceMod](https://www.sourcemod.net/about.php)
+Singleplayer and cooperative PvE mod for **Counter-Strike: Source**, that brings mission based gameplay experience from **Counter-Strike: Condition Zero**
 
-### ✨ Features
+### [<img src="./Images/czero.svg" height="16" alt="🍊"> Condition Zero: Source Installer](https://github.com/MuxaJlbl4/Condition-Zero-Source/releases/download/1.0/Condition-Zero-Source-1.0.exe)
+
+### [<img src="./Images/banana.png" height="16" alt="🍌"> Additional Campaigns](https://gamebanana.com/mods/cats/45201)
+
+## ✨ Features
 
 - 🏆 Task tracking system from **Counter-Strike: Condition Zero**
 - 🎁 Support for custom maps and campaigns
@@ -15,16 +19,18 @@ Singleplayer and cooperative PvE mod for **Counter-Strike: Source**, powered by 
 - 🎨 Campaign editor
 - 👯‍♀️ Co-op support
 
-### 📝 Notes
+## 📝 Notes
 
+- 🟠 Powered by [SourceMod](https://www.sourcemod.net/about.php)
 - 🪟 Compatible with **Windows** and [x64 update](https://steamdb.info/depot/232331/history/?changeid=M:4432809338483152243)
 - 👍 Uses [Bot2Player](https://forums.alliedmods.net/showthread.php?t=215830) plugin by [Bittersweet](https://forums.alliedmods.net/member.php?u=181976) - press `E` while spectating any bot-teammate
 - ⚠️ Some original game features are simplified:
 	- 👥 No ability to assemble team - Difficulty based team composition with predefined count and tasks
+	- 🗺️ Based on official **CS:S** maps - Download [Condition Zero +](https://gamebanana.com/mods/672635) for missed **CS:CZ** maps
 	- 🔓 No progress saving - All missions are unlocked
 	- 🛡️ No shields - Shield tasks replaced with pistols
 
-### 📷 Screenshots
+## 📷 Screenshots
 
 ![](Images/scr_missions.jpg)
 Game menu and mission browser
@@ -37,15 +43,15 @@ Campaign task tracking
 <br><br><br>
 ![](Images/scr_tt.jpg)
 Random generated mission
-<br><br><br>
-### 💾 Installation
+
+## 💾 Installation
 
 1. Install clean [Counter-Strike: Source](https://store.steampowered.com/app/240/CounterStrike_Source)
-2. Install [Condition-Zero-Source.exe](https://github.com/MuxaJlbl4/Condition-Zero-Source/releases/download/1.0/Condition-Zero-Source-1.0.exe)
+2. Install [Condition-Zero-Source.exe](https://github.com/MuxaJlbl4/Condition-Zero-Source/releases/download/1.0/Condition-Zero-Source-1.0.exe) to your `cstrike` folder
 3. Set `-insecure` launch option for **Counter-Strike: Source** via **Steam** [game properties](Images/insecure.png)
-4. Launch **Counter-Strike: Source**
+4. Start **Counter-Strike: Source**
 
-### 🌍 Multiplayer
+## 🌍 Multiplayer
 
 1. Start any mission
 2. Everyone in your **LAN** can join to you by `connect <IP>` or via `FIND SERVERS` -> `LAN`
@@ -56,11 +62,16 @@ Additional multiplayer options:
 - `sv_password` - Password protection for private game
 - See [Coop Commands](#coop-commands) for additional gameplay adjustments
 
+## 📜 Game Menu
+
+- **Play Counter-Strike: Condition Zero** - Choose campaign to play
+- **Start Random Mission** - Choose map to play with random tasks
+- **Active Tasks** - Show current task status
+- **Give Up This Round** - Skip current round
+
 ## 💻 Console Commands
 
 ### Task Commands
-
-Gameplay tweaks:
 
 - `cz_task_add` - Add a new task (see [Task Arguments](#%EF%B8%8F⃣-task-arguments))
 - `cz_task_reset` - Reset all task progress
@@ -89,8 +100,6 @@ Available with `sv_cheats 1`:
 - `cz_defeat` - Force match defeat
 
 ### Debug Commands
-
-Miscellaneous:
 
 - `cz_teamchosen` - Is team and difficulty already chosen for this session
 - `cz_task_delete` - Delete all tasks
@@ -232,11 +241,18 @@ cs_italy
 
 10. Copy `My_Campaign` folder to `...\Steam\steamapps\common\Counter-Strike Source\cstrike\custom`, your campaign should appear in game mission browser
 
+Also you can use [Example Campaign](https://gamebanana.com/mods/672803) as a ready template:
+
+- Edit campaign name (`Example_Campaign`) wherever it is mentioned (file/folder names, file contents, all hostnames)
+- Edit `mapcycle.txt` with your ordered map names
+- Edit `cfg` and `bns` files
+- Add your files
+
 ## 🏗️ Manual Building
 
 1. Install clean [Counter-Strike: Source](https://store.steampowered.com/app/240/CounterStrike_Source)
 2. Install latest [Metamod:Source](https://www.sourcemm.net/downloads.php/?branch=master)
 3. Install latest [SourceMod](https://www.sourcemod.net/downloads.php?branch=dev)
 4. Compile plugins with `compile-condition-zero.bat` and `compile-bot2player.bat`
-5. Compile and install INNO file: `Installer.iss`
+5. Compile and install Inno script: `Installer.iss`
 6. Set game launch options: `-insecure`
