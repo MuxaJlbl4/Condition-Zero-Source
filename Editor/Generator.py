@@ -41,7 +41,7 @@ CONFIG = "cz_matchwins\t3\ncz_matchwinsby\t2\n\nmp_startmoney\t16000";
 def process_txt_files():
     for filename in os.listdir('.'):
         if filename.endswith('.txt') and os.path.isfile(filename):
-            base_name = os.path.splitext(filename)[0]
+            base_name = os.path.splitext(filename)[0].lower().replace(" ","_")
             
             # Create folder structure
             cfg_path = os.path.join(base_name, 'cfg', base_name)
@@ -88,7 +88,7 @@ def process_txt_files():
 
             # Create folderinfo.bns
             with open(os.path.join(maps_path, 'folderinfo.bns'), 'w') as f:
-                f.write(f"\"{base_name.replace("_"," ")}\"\n{{\n\t\"image\"\t\t\"{base_name}.tga\"\n\t\"comment\"\t\"{base_name.replace("_"," ")}\"\n}}")
+                f.write(f"\"{base_name.replace("_"," ").title()}\"\n{{\n\t\"image\"\t\t\"{base_name}.tga\"\n\t\"comment\"\t\"{base_name.replace("_"," ").title()}\"\n}}")
             
             # Create campaign.bns with formatted mission names
             with open(os.path.join(maps_path, 'campaign.bns'), 'w') as f:

@@ -9,8 +9,7 @@
 #define MISSION_FAILED		"music/train_failure.mp3"
 #define TASK_COMPLETED		"events/task_complete.wav"
 
-#define CAMPAIGN_CONFIG		"Condition_Zero"
-#define RANDOM_MISSION		"Random_Mission"
+#define CAMPAIGN_CONFIG		"condition_zero"
 
 public Plugin myinfo = 
 {

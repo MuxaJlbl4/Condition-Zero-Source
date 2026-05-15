@@ -1,5 +1,5 @@
 #define MyAppName "Condition Zero: Source"
-#define MyAppVersion "1.0"
+#define MyAppVersion "1.1"
 #define MyAppPublisher "Miishanya"
 #define MyAppURL "https://github.com/MuxaJlbl4/Condition-Zero-Source"
 
@@ -30,7 +30,7 @@ Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 
 [Files]
 Source: "C:\Program Files (x86)\Steam\steamapps\common\Counter-Strike Source\cstrike\addons\*"; DestDir: "{app}\addons\"; Excludes: "*.sq3,*.log"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "Resources\*";  DestDir: "{app}\custom\Condition_Zero\"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "Resources\*";  DestDir: "{app}\custom\condition_zero\"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "Plugins\bot2player\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "Plugins\condition-zero\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "Images\czero.ico"; DestDir: "{app}"; Flags: ignoreversion
