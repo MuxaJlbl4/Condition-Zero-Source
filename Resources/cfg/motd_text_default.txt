@@ -1,0 +1,13 @@
+WARNING!
+
+Condition Zero is installed, but SourceMod is not running
+
+Please, restart the game with "-insecure" launch option:
+
+    1. Close the game and go to your Steam library
+
+    2. Right click on Counter-Strike: Source, select Properties...
+
+    3. Type following in the LAUNCH OPTIONS:
+
+        -insecure

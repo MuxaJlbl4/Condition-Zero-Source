@@ -3,7 +3,7 @@
 #include <sdktools>
 #include <clientprefs>
 
-#define PLUGIN_VERSION		"1.0-RC"
+#define PLUGIN_VERSION		"1.1-RC"
 
 #define MISSION_COMPLETE	"music/thinice_success.mp3"
 #define MISSION_FAILED		"music/train_failure.mp3"
@@ -29,6 +29,7 @@ enum struct AchievementTask
 	bool RequireHeadshot;
 	bool WithoutDying;
 	bool RequireSurvival;
+	bool RequireNoReload;
 	int CurrentProgress;
 	bool Completed;
 }
@@ -36,6 +37,7 @@ enum struct AchievementTask
 float g_RoundStartTime;
 bool g_bBlinded[MAXPLAYERS+1], g_bUseOriginalAutobuy;
 int g_TotalHostages, g_HostagesRescuedThisRound;
+int g_iLastClip[MAXPLAYERS+1];
 ArrayList g_Tasks, g_hFollowedHostages, g_UsedWeapons;
 ConVar g_cvHumanTeam, g_cvMatchwins, g_cvMatchwinsby, g_cvFreezeTime, g_cvBotDifficulty, g_cvTeamChosen, g_cvSimpleCoop, g_cvHostname, g_cvTeammates, g_cvOpponents, g_cvBotsPerPlayer, g_cvBotQuota, g_cvCheats;
 
@@ -82,6 +84,7 @@ public OnPluginStart()
 	
 	// Hook game events
 	HookEvent("player_death", Event_PlayerDeath);
+	HookEvent("player_hurt", Event_PlayerHurt);
 	HookEvent("round_end", Event_RoundEnd);
 	HookEvent("round_start", Event_RoundStart);
 	HookEvent("player_blind", Event_PlayerBlind);
@@ -103,7 +106,7 @@ public OnPluginStart()
 	
 	// Hook VGUI
 	HookUserMessage(GetUserMessageId("VGUIMenu"), VGUIMenu, true);
-	
+
 	// Reset team and difficulty chose for random missions
 	if (IsRandomMission())
 		g_cvTeamChosen.IntValue = 0;
@@ -216,7 +219,7 @@ public void SetRandomMission()
 	GetCurrentMap(currentMap, sizeof(currentMap));
 	
 	// Add random tasks
-	if ((currentMap[0] == 'c' && currentMap[1] == 's') || (currentMap[0] == 'd' && currentMap[1] == 'e'))
+	if ((currentMap[0] == 'c' && currentMap[1] == 's' && currentMap[2] == '_') || (currentMap[0] == 'd' && currentMap[1] == 'e' && currentMap[2] == '_'))
 	{
 		AddRandomTask(s_TaskListFirst, sizeof(s_TaskListFirst));
 		AddRandomTask(s_TaskListSecond, sizeof(s_TaskListSecond));
@@ -310,6 +313,12 @@ public void OnMapStart()
 	
 	// Delete old tasks
 	Command_DeleteAllTasks(0, 0);
+	
+	// Auto reload tracking:
+	static Handle s_hClipTimer;
+	if (s_hClipTimer != null)
+		KillTimer(s_hClipTimer);
+	s_hClipTimer = CreateTimer(1.0, Timer_CheckClip, _, TIMER_REPEAT);
 }
 
 static bool File_Copy(const char[] source, const char[] destination)
@@ -465,7 +474,7 @@ public Action Timer_SafeRestartLevel(Handle timer)
 public Action Timer_SafeInitBotTeams(Handle timer)
 {
 	InitBotTeams();
-	
+
 	return Plugin_Continue;
 }
 
@@ -557,12 +566,30 @@ public void MissionFailed()
 public void MissionCompleted()
 {
 	// Show scoreboard and proceed to next map
-	EmitSoundToAllPlayers(MISSION_COMPLETE);
 	new iGameEnd = FindEntityByClassname(-1, "game_end");
 	if (iGameEnd == -1 && (iGameEnd = CreateEntityByName("game_end")) == -1)
 		LogError("Unable to create entity \"game_end\"!");
 	else
 		AcceptEntityInput(iGameEnd, "EndGame");
+	
+	// Remove all weapons for players
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (IsValidClient(i) && !IsFakeClient(i))
+		{
+			new iEnt;
+			for (new j = 0; j <= 4; j++)
+			{
+				while ((iEnt = GetPlayerWeaponSlot(i, j)) != -1)
+				{
+					RemovePlayerItem(i, iEnt);
+					AcceptEntityInput(iEnt, "Kill");
+				}
+			}
+		}
+	}
+	
+	EmitSoundToAllPlayers(MISSION_COMPLETE);
 }
 
 public void PrepareMissionCompletion()
@@ -618,21 +645,25 @@ public Action Command_AddTask(int client, int args)
 	
 	// Argument validation per task type
 	if (StrEqual(type, "kill") && args < 2)
-		ReplyToCommand(client, "Usage: cz_task_add kill <target> [headshot] [inarow] [survive]");
+		ReplyToCommand(client, "Usage: cz_task_add kill <target> [headshot] [inarow] [survive] [noreload]");
 	else if (StrEqual(type, "killwith") && args < 3)
-		ReplyToCommand(client, "Usage: cz_task_add killwith <target> <weapon> [headshot] [inarow] [survive]");
+		ReplyToCommand(client, "Usage: cz_task_add killwith <target> <weapon> [headshot] [inarow] [survive] [noreload]");
 	else if (StrEqual(type, "killblind") && args < 2)
-		ReplyToCommand(client, "Usage: cz_task_add killblind <target> [headshot] [inarow] [survive]");
+		ReplyToCommand(client, "Usage: cz_task_add killblind <target> [headshot] [inarow] [survive] [noreload]");
 	else if (StrEqual(type, "killsilent") && args < 2)
-		ReplyToCommand(client, "Usage: cz_task_add killsilent <target> [headshot] [inarow] [survive]");
+		ReplyToCommand(client, "Usage: cz_task_add killsilent <target> [headshot] [inarow] [survive] [noreload]");
 	else if (StrEqual(type, "killnoscope") && args < 2)
-		ReplyToCommand(client, "Usage: cz_task_add killnoscope <target> [headshot] [inarow] [survive]");
+		ReplyToCommand(client, "Usage: cz_task_add killnoscope <target> [headshot] [inarow] [survive] [noreload]");
 	else if (StrEqual(type, "killjump") && args < 2)
-		ReplyToCommand(client, "Usage: cz_task_add killjump <target> [headshot] [inarow] [survive]");
+		ReplyToCommand(client, "Usage: cz_task_add killjump <target> [headshot] [inarow] [survive] [noreload]");
 	else if (StrEqual(type, "killvary") && args < 2)
-		ReplyToCommand(client, "Usage: cz_task_add killvary <target> [headshot] [inarow] [survive]");
-	else if (StrEqual(type, "killnoreload") && args < 2)
-		ReplyToCommand(client, "Usage: cz_task_add killnoreload <target> [headshot] [inarow] [survive]");
+		ReplyToCommand(client, "Usage: cz_task_add killvary <target> [headshot] [inarow] [survive] [noreload]");
+	else if (StrEqual(type, "killtrophy") && args < 2)
+		ReplyToCommand(client, "Usage: cz_task_add killtrophy <target> [headshot] [inarow] [survive] [noreload]");
+	else if (StrEqual(type, "damage") && args < 2)
+		ReplyToCommand(client, "Usage: cz_task_add damage <target> [headshot] [inarow] [survive] [noreload]");
+	else if (StrEqual(type, "damagewith") && args < 3)
+		ReplyToCommand(client, "Usage: cz_task_add damagewith <target> <weapon> [headshot] [inarow] [survive] [noreload]");
 	else if (StrEqual(type, "winfast") && args < 2)
 		ReplyToCommand(client, "Usage: cz_task_add winfast <target> [survive]");
 	else if (StrEqual(type, "rescue") && args < 2)
@@ -649,68 +680,46 @@ public Action Command_AddTask(int client, int args)
 		AchievementTask task;
 		strcopy(task.TaskType, sizeof(task.TaskType), type);
 		
-		// Parse arguments
-		if (StrEqual(type, "kill") || StrEqual(type, "killblind") || StrEqual(type, "killsilent") || StrEqual(type, "killnoscope") || StrEqual(type, "killjump") || StrEqual(type, "killvary") || StrEqual(type, "killnoreload"))
+		if (StrEqual(type, "kill") ||
+		StrEqual(type, "killblind") ||
+		StrEqual(type, "killsilent") ||
+		StrEqual(type, "killnoscope") ||
+		StrEqual(type, "killjump") || 
+		StrEqual(type, "killvary") || 
+		StrEqual(type, "killtrophy") || 
+		StrEqual(type, "damage"))
 		{
-			task.TargetValue = ParseTargetValue(buffer);
+			task.TargetValue     = ParseTargetValue(buffer);
 			task.RequireHeadshot = StrContains(buffer, "headshot") != -1;
-			task.WithoutDying = StrContains(buffer, "inarow") != -1;
-			task.RequireSurvival = StrContains(buffer, "survive") != -1;
-		} 
-		else if (StrEqual(type, "killwith"))
+			task.WithoutDying    = StrContains(buffer, "inarow")   != -1;
+			task.RequireSurvival = StrContains(buffer, "survive")  != -1;
+			task.RequireNoReload = StrContains(buffer, "noreload") != -1;
+		}
+		// killwith
+		else if (StrEqual(type, "killwith") ||
+		StrEqual(type, "damagewith"))
 		{
 			task.TargetValue = ParseTargetValue(buffer);
 			ParseWeapon(buffer, task.Weapon, sizeof(task.Weapon));
-			if (!StrEqual(task.Weapon, "glock") &&
-				!StrEqual(task.Weapon, "usp") &&
-				!StrEqual(task.Weapon, "p228") &&
-				!StrEqual(task.Weapon, "deagle") &&
-				!StrEqual(task.Weapon, "elite") &&
-				!StrEqual(task.Weapon, "fiveseven") &&
-				!StrEqual(task.Weapon, "m3") &&
-				!StrEqual(task.Weapon, "xm1014") &&
-				!StrEqual(task.Weapon, "galil") &&
-				!StrEqual(task.Weapon, "ak47") &&
-				!StrEqual(task.Weapon, "scout") &&
-				!StrEqual(task.Weapon, "sg552") &&
-				!StrEqual(task.Weapon, "awp") &&
-				!StrEqual(task.Weapon, "g3sg1") &&
-				!StrEqual(task.Weapon, "famas") &&
-				!StrEqual(task.Weapon, "m4a1") &&
-				!StrEqual(task.Weapon, "aug") &&
-				!StrEqual(task.Weapon, "sg550") &&
-				!StrEqual(task.Weapon, "mac10") &&
-				!StrEqual(task.Weapon, "tmp") &&
-				!StrEqual(task.Weapon, "mp5navy") &&
-				!StrEqual(task.Weapon, "ump45") &&
-				!StrEqual(task.Weapon, "p90") &&
-				!StrEqual(task.Weapon, "m249") &&
-				!StrEqual(task.Weapon, "hegrenade") &&
-				!StrEqual(task.Weapon, "knife") &&
-				!StrEqual(task.Weapon, "pistol") &&
-				!StrEqual(task.Weapon, "shotgun") &&
-				!StrEqual(task.Weapon, "smg") &&
-				!StrEqual(task.Weapon, "rifle") &&
-				!StrEqual(task.Weapon, "sniper") &&
-				!StrEqual(task.Weapon, "machinegun"))
+			if (!IsValidWeaponArg(task.Weapon))
 			{
 				ReplyToCommand(client, "Unknown or unsupported weapon type. Available weapons: glock, usp, p228, deagle, elite, fiveseven, m3, xm1014, galil, ak47, scout, sg552, awp, g3sg1, famas, m4a1, aug, sg550, mac10, tmp, mp5navy, ump45, p90, m249, hegrenade, knife. Available weapons classes: pistol, shotgun, smg, rifle, sniper, machinegun");
 				return Plugin_Handled;
 			}
 			task.RequireHeadshot = StrContains(buffer, "headshot") != -1;
-			task.WithoutDying = StrContains(buffer, "inarow") != -1;
-			task.RequireSurvival = StrContains(buffer, "survive") != -1;
+			task.WithoutDying    = StrContains(buffer, "inarow")   != -1;
+			task.RequireSurvival = StrContains(buffer, "survive")  != -1;
+			task.RequireNoReload = StrContains(buffer, "noreload") != -1;
 			if (StrEqual(task.Weapon, "knife", false) || StrEqual(task.Weapon, "hegrenade", false))
 				task.RequireHeadshot = false;
 		}
 		else if (StrEqual(type, "winfast"))
 		{
-			task.TargetValue = ParseTargetValue(buffer);
+			task.TargetValue     = ParseTargetValue(buffer);
 			task.RequireSurvival = StrContains(buffer, "survive") != -1;
 		}
 		else if (StrEqual(type, "rescue"))
 		{
-			// Block rescue tasks for T team
 			if (IsHumanTeamT())
 			{
 				ReplyToCommand(client, "Rescue tasks are not available for T team");
@@ -720,7 +729,6 @@ public Action Command_AddTask(int client, int args)
 		}
 		else if (StrEqual(type, "rescueall"))
 		{
-			// Block rescue tasks for T team
 			if (IsHumanTeamT())
 			{
 				ReplyToCommand(client, "Rescue tasks are not available for T team");
@@ -737,17 +745,36 @@ public Action Command_AddTask(int client, int args)
 		}
 		else
 		{
-			ReplyToCommand(client, "Unknown task type. Available types: kill, killwith, killblind, killsilent, killnoscope, killjump, killvary, killnoreload, winfast, rescue, rescueall, spray, bomb");
+			ReplyToCommand(client, "Unknown task type. Available types: kill, killwith, killblind, killsilent, killnoscope, killjump, killvary, damage, damagewith, winfast, rescue, rescueall, spray, bomb");
 			return Plugin_Handled;
 		}
 		
 		// Create task		
 		g_Tasks.PushArray(task, sizeof(task));
 		ReplyToCommand(client, "Task added: %s", buffer);
-	
 	}
 	
 	return Plugin_Handled;
+}
+
+bool IsValidWeaponArg(const char[] weapon)
+{
+	return  StrEqual(weapon, "glock")      || StrEqual(weapon, "usp")       ||
+	        StrEqual(weapon, "p228")       || StrEqual(weapon, "deagle")     ||
+	        StrEqual(weapon, "elite")      || StrEqual(weapon, "fiveseven")  ||
+	        StrEqual(weapon, "m3")         || StrEqual(weapon, "xm1014")     ||
+	        StrEqual(weapon, "galil")      || StrEqual(weapon, "ak47")       ||
+	        StrEqual(weapon, "scout")      || StrEqual(weapon, "sg552")      ||
+	        StrEqual(weapon, "awp")        || StrEqual(weapon, "g3sg1")      ||
+	        StrEqual(weapon, "famas")      || StrEqual(weapon, "m4a1")       ||
+	        StrEqual(weapon, "aug")        || StrEqual(weapon, "sg550")      ||
+	        StrEqual(weapon, "mac10")      || StrEqual(weapon, "tmp")        ||
+	        StrEqual(weapon, "mp5navy")    || StrEqual(weapon, "ump45")      ||
+	        StrEqual(weapon, "p90")        || StrEqual(weapon, "m249")       ||
+	        StrEqual(weapon, "hegrenade")  || StrEqual(weapon, "knife")      ||
+	        StrEqual(weapon, "pistol")     || StrEqual(weapon, "shotgun")    ||
+	        StrEqual(weapon, "smg")        || StrEqual(weapon, "rifle")      ||
+	        StrEqual(weapon, "sniper")     || StrEqual(weapon, "machinegun");
 }
 
 public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
@@ -758,7 +785,7 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 	// If Player is victim
 	if (IsValidClient(victim))
 	{
-		// Reset survival tasks on player death
+		// Reset survival / inarow tasks on player death
 		for (int i = 0; i < g_Tasks.Length; i++)
 		{
 			AchievementTask task;
@@ -811,7 +838,7 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 					if (!isHeadshot)
 						continue;
 				
-				// Update kill count (check survival later)
+				// Update kill count
 				if (StrEqual(task.TaskType, "kill"))
 				{
 					task.CurrentProgress++;
@@ -858,13 +885,14 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 					task.CurrentProgress++;
 					taskUpdated = true;
 				}
-				else if (StrEqual(task.TaskType, "killnoreload"))
+				else if (StrEqual(task.TaskType, "killtrophy") && IsTrophyWeapon(weapon))
 				{
 					task.CurrentProgress++;
 					taskUpdated = true;
 				}
 				else
 					continue;
+
 				// Update task completion
 				CheckKillCompletion(attacker, task, i);
 				g_Tasks.SetArray(i, task, sizeof(task));
@@ -872,6 +900,80 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 				if (!task.Completed && taskUpdated)
 					ShowTaskProgress(task);
 			}
+		}
+	}
+}
+
+public void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
+{
+	int attacker = GetClientOfUserId(event.GetInt("attacker"));
+	int victim   = GetClientOfUserId(event.GetInt("userid"));
+	
+	if (!IsValidClient(attacker))
+		return;
+	
+	// Skip team damage
+	if (GetClientTeam(attacker) == GetClientTeam(victim))
+		return;
+	
+	int dmg = event.GetInt("dmg_health");
+	if (dmg <= 0)
+		return;
+	
+	char weapon[32];
+	event.GetString("weapon", weapon, sizeof(weapon));
+	
+	// hitgroup 1 = head
+	bool isHeadshot = (event.GetInt("hitgroup") == 1);
+	
+	for (int i = 0; i < g_Tasks.Length; i++)
+	{
+		AchievementTask task;
+		g_Tasks.GetArray(i, task, sizeof(task));
+		
+		if (task.Completed)
+			continue;
+		
+		if (task.RequireHeadshot && !isHeadshot)
+			continue;
+		
+		bool taskUpdated = false;
+		
+		if (StrEqual(task.TaskType, "damage"))
+		{
+			task.CurrentProgress += dmg;
+			taskUpdated = true;
+		}
+		else if (StrEqual(task.TaskType, "damagewith"))
+		{
+			if (IsWeaponClass(task.Weapon))
+			{
+				if (IsWeaponClassValid(weapon, task.Weapon))
+				{
+					task.CurrentProgress += dmg;
+					taskUpdated = true;
+				}
+			}
+			else if (StrEqual(weapon, task.Weapon))
+			{
+				task.CurrentProgress += dmg;
+				taskUpdated = true;
+			}
+		}
+		
+		if (taskUpdated)
+		{
+			// Clamp progress to target so it doesn't wildly overflow in the display
+			if (task.CurrentProgress > task.TargetValue)
+				task.CurrentProgress = task.TargetValue;
+			
+			g_Tasks.SetArray(i, task, sizeof(task));
+			
+			// Immediate completion only when survival is not required
+			if (!task.RequireSurvival && task.CurrentProgress >= task.TargetValue && !task.Completed)
+				TaskCompleted(task, i);
+			else if (!task.Completed)
+				ShowTaskProgress(task);
 		}
 	}
 }
@@ -920,6 +1022,15 @@ public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 	
 	g_hFollowedHostages.Clear();
 	
+	// Singleplayer admin client
+	bool survivor = true;
+	
+	// Check survival
+	if (g_cvSimpleCoop.IntValue)
+		survivor = (CountAlivePlayers() > 0);
+	else
+		survivor = !(CountDeadPlayers() > 0);
+	
 	// Iterate through all tasks
 	for (int i = 0; i < g_Tasks.Length; i++)
 	{
@@ -931,31 +1042,31 @@ public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 		
 		if (StrEqual(task.TaskType, "winfast"))
 		{
-			// Search for player
-			for (int client = 1; client <= MaxClients; client++)
+			if (roundTime <= task.TargetValue && GetClientTeam(1) == winner)
 			{
-				if (IsValidClient(client) && GetClientTeam(client) == winner)
-				{
-					if (roundTime <= task.TargetValue)
-					{
-						// Check for player alive for survival condition
-						if (!task.RequireSurvival || IsPlayerAlive(client))
-							TaskCompleted(task, i);
-					}
-				}
+				// Check for player alive for survival condition
+				if (survivor)
+					TaskCompleted(task, i);
 			}
 		}
 		else if (task.RequireSurvival)
 		{
-			// Search for alive player
-			for (int client = 1; client <= MaxClients; client++)
+			// Update task completion
+			if (survivor && task.CurrentProgress >= task.TargetValue && !task.Completed)
 			{
-				if (IsValidClient(client))
-				{
-					// Update task completion
-					CheckSurvivalCompletion(client, task, i);
-					g_Tasks.SetArray(i, task, sizeof(task));
-				}
+				char message[128];
+				GetTaskDescription(task, message, sizeof(message));
+				
+				TaskCompleted(task, i);
+			}
+			else
+			{
+				// Reset weapons for killvary
+				if (StrEqual(task.TaskType, "killvary") && task.RequireSurvival && !task.Completed)
+					ResetWeapons();
+				// If task not fully completed or player killed - reset task progress
+				task.CurrentProgress = 0;
+				g_Tasks.SetArray(i, task, sizeof(task));
 			}
 		}
 	}
@@ -998,22 +1109,7 @@ void UpdateRescueTasks(bool UpdateSingleHostage)
 
 public void CheckSurvivalCompletion(int client, AchievementTask task, int taskIndex)
 {	
-	if (IsPlayerAlive(client))
-	{
-		// If task completed
-		if (task.CurrentProgress >= task.TargetValue && !task.Completed)
-		{
-			char message[128];
-			GetTaskDescription(task, message, sizeof(message));
-			
-			TaskCompleted(task, taskIndex);
-			
-			return;
-		}
-	}
-	// If task not fully completed or player killed - reset task progress
-	task.CurrentProgress = 0;
-	g_Tasks.SetArray(taskIndex, task, sizeof(task));
+
 }
 
 public void Event_HostageRescued(Event event, const char[] name, bool dontBroadcast)
@@ -1060,15 +1156,15 @@ bool IsValidHostage(int entity)
 
 public void GetTaskDescription(const AchievementTask task, char[] buffer, int maxlen)
 {
-	// Task formatting
 	if (StrEqual(task.TaskType, "kill"))
 	{
-		Format(buffer, maxlen, "Kill %d enem%s%s%s%s%s %s%s%s%s",
+		Format(buffer, maxlen, "Kill %d enem%s%s%s%s%s%s %s%s%s%s",
 			task.TargetValue,
 			task.TargetValue != 1 ? "ies" : "y",
 			task.RequireHeadshot ? " with headshot" : "",
 			task.RequireHeadshot && task.TargetValue != 1 ? "s" : "",
-			task.WithoutDying ? " without dying" : "",
+			task.WithoutDying    ? " without dying"     : "",
+			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
 			!task.Completed && task.CurrentProgress > 0 ? FormatNumber(task.CurrentProgress) : "",
@@ -1080,13 +1176,14 @@ public void GetTaskDescription(const AchievementTask task, char[] buffer, int ma
 		char weaponName[32];
 		GetFormattedWeaponName(task.Weapon, weaponName, sizeof(weaponName));
 		
-		Format(buffer, maxlen, "Kill %d enem%s with %s%s%s%s%s %s%s%s%s", 
+		Format(buffer, maxlen, "Kill %d enem%s with %s%s%s%s%s%s %s%s%s%s", 
 			task.TargetValue,
 			task.TargetValue != 1 ? "ies" : "y",
 			weaponName,
 			task.RequireHeadshot ? " with headshot" : "",
 			task.RequireHeadshot && task.TargetValue != 1 ? "s" : "",
-			task.WithoutDying ? " without dying" : "",
+			task.WithoutDying    ? " without dying"     : "",
+			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
 			!task.Completed && task.CurrentProgress > 0 ? FormatNumber(task.CurrentProgress) : "",
@@ -1095,12 +1192,13 @@ public void GetTaskDescription(const AchievementTask task, char[] buffer, int ma
 	}
 	else if (StrEqual(task.TaskType, "killblind"))
 	{
-		Format(buffer, maxlen, "Kill %d flashbang-blinded enem%s%s%s%s%s %s%s%s%s", 
+		Format(buffer, maxlen, "Kill %d flashbang-blinded enem%s%s%s%s%s%s %s%s%s%s", 
 			task.TargetValue,
 			task.TargetValue != 1 ? "ies" : "y",
 			task.RequireHeadshot ? " with headshot" : "",
 			task.RequireHeadshot && task.TargetValue != 1 ? "s" : "",
-			task.WithoutDying ? " without dying" : "",
+			task.WithoutDying    ? " without dying"     : "",
+			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
 			!task.Completed && task.CurrentProgress > 0 ? FormatNumber(task.CurrentProgress) : "",
@@ -1109,12 +1207,13 @@ public void GetTaskDescription(const AchievementTask task, char[] buffer, int ma
 	}
 	else if (StrEqual(task.TaskType, "killsilent"))
 	{
-		Format(buffer, maxlen, "Kill %d enem%s with silenced weapon%s%s%s%s %s%s%s%s", 
+		Format(buffer, maxlen, "Kill %d enem%s with silenced weapon%s%s%s%s%s %s%s%s%s", 
 			task.TargetValue,
 			task.TargetValue != 1 ? "ies" : "y",
 			task.RequireHeadshot ? " with headshot" : "",
 			task.RequireHeadshot && task.TargetValue != 1 ? "s" : "",
-			task.WithoutDying ? " without dying" : "",
+			task.WithoutDying    ? " without dying"     : "",
+			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
 			!task.Completed && task.CurrentProgress > 0 ? FormatNumber(task.CurrentProgress) : "",
@@ -1123,12 +1222,13 @@ public void GetTaskDescription(const AchievementTask task, char[] buffer, int ma
 	}
 	else if (StrEqual(task.TaskType, "killnoscope"))
 	{
-		Format(buffer, maxlen, "Kill %d enem%s with an un-zoomed sniper rifle%s%s%s%s %s%s%s%s", 
+		Format(buffer, maxlen, "Kill %d enem%s with an un-zoomed sniper rifle%s%s%s%s%s %s%s%s%s", 
 			task.TargetValue,
 			task.TargetValue != 1 ? "ies" : "y",
 			task.RequireHeadshot ? " with headshot" : "",
 			task.RequireHeadshot && task.TargetValue != 1 ? "s" : "",
-			task.WithoutDying ? " without dying" : "",
+			task.WithoutDying    ? " without dying"     : "",
+			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
 			!task.Completed && task.CurrentProgress > 0 ? FormatNumber(task.CurrentProgress) : "",
@@ -1137,12 +1237,13 @@ public void GetTaskDescription(const AchievementTask task, char[] buffer, int ma
 	}
 	else if (StrEqual(task.TaskType, "killjump"))
 	{
-		Format(buffer, maxlen, "Kill %d enem%s while you are airborne%s%s%s%s %s%s%s%s", 
+		Format(buffer, maxlen, "Kill %d enem%s while you are airborne%s%s%s%s%s %s%s%s%s", 
 			task.TargetValue,
 			task.TargetValue != 1 ? "ies" : "y",
 			task.RequireHeadshot ? " with headshot" : "",
 			task.RequireHeadshot && task.TargetValue != 1 ? "s" : "",
-			task.WithoutDying ? " without dying" : "",
+			task.WithoutDying    ? " without dying"     : "",
+			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
 			!task.Completed && task.CurrentProgress > 0 ? FormatNumber(task.CurrentProgress) : "",
@@ -1151,28 +1252,60 @@ public void GetTaskDescription(const AchievementTask task, char[] buffer, int ma
 	}
 	else if (StrEqual(task.TaskType, "killvary"))
 	{
-		Format(buffer, maxlen, "Kill %d enem%s with different weapon%s%s%s%s%s %s%s%s%s", 
+		Format(buffer, maxlen, "Kill %d enem%s with different weapon%s%s%s%s%s%s %s%s%s%s", 
 			task.TargetValue,
 			task.TargetValue != 1 ? "ies" : "y",
 			task.RequireHeadshot ? " with headshot" : "",
 			task.RequireHeadshot && task.TargetValue != 1 ? "s" : "",
 			task.RequireHeadshot && task.TargetValue != 1 ? "s" : "",
-			task.WithoutDying ? " without dying" : "",
+			task.WithoutDying    ? " without dying"     : "",
+			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
 			!task.Completed && task.CurrentProgress > 0 ? FormatNumber(task.CurrentProgress) : "",
 			!task.Completed && task.CurrentProgress > 0 ? "]" : "",
 			task.Completed ? "[\xE2\x9C\x93]" : "");
 	}
-	else if (StrEqual(task.TaskType, "killnoreload"))
+	else if (StrEqual(task.TaskType, "killtrophy"))
 	{
-		Format(buffer, maxlen, "Kill %d enem%s without reloading%s%s%s%s %s%s%s%s", 
+		Format(buffer, maxlen, "Kill %d enem%s with enemy's exclusive weapon%s%s%s%s %s%s%s%s",
 			task.TargetValue,
 			task.TargetValue != 1 ? "ies" : "y",
-			task.RequireHeadshot ? " with headshot" : "",
-			task.RequireHeadshot && task.TargetValue != 1 ? "s" : "",
-			task.WithoutDying ? " without dying" : "",
+			task.RequireHeadshot ? " with headshots"    : "",
+			task.WithoutDying    ? " without dying"     : "",
+			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
+			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
+			!task.Completed && task.CurrentProgress > 0 ? FormatNumber(task.CurrentProgress) : "",
+			!task.Completed && task.CurrentProgress > 0 ? "]" : "",
+			task.Completed ? "[\xE2\x9C\x93]" : "");
+	}
+	else if (StrEqual(task.TaskType, "damage"))
+	{
+		Format(buffer, maxlen, "Deal %d damage to enemies%s%s%s%s%s %s%s%s%s",
+			task.TargetValue,
+			task.RequireHeadshot ? " with headshots"    : "",
+			task.WithoutDying    ? " without dying"     : "",
+			task.RequireNoReload ? " without reloading" : "",
+			task.RequireSurvival ? " and survive the round" : "",
+			"",   // placeholder keeps arg count consistent
+			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
+			!task.Completed && task.CurrentProgress > 0 ? FormatNumber(task.CurrentProgress) : "",
+			!task.Completed && task.CurrentProgress > 0 ? "]" : "",
+			task.Completed ? "[\xE2\x9C\x93]" : "");
+	}
+	else if (StrEqual(task.TaskType, "damagewith"))
+	{
+		char weaponName[32];
+		GetFormattedWeaponName(task.Weapon, weaponName, sizeof(weaponName));
+		
+		Format(buffer, maxlen, "Deal %d damage to enemies with %s%s%s%s%s %s%s%s%s",
+			task.TargetValue,
+			weaponName,
+			task.WithoutDying    ? " without dying"     : "",
+			task.RequireNoReload ? " without reloading" : "",
+			task.RequireSurvival ? " and survive the round" : "",
+			"",   // placeholder
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
 			!task.Completed && task.CurrentProgress > 0 ? FormatNumber(task.CurrentProgress) : "",
 			!task.Completed && task.CurrentProgress > 0 ? "]" : "",
@@ -1322,7 +1455,7 @@ void ParseWeapon(const char[] buffer, char[] weapon, int maxlen)
 		}
 
 		// Capture the first non-keyword after the target value
-		if (foundTarget && !StrEqual(parts[i], "inarow") && !StrEqual(parts[i], "survive") && !StrEqual(parts[i], "headshot"))
+		if (foundTarget && !StrEqual(parts[i], "inarow") && !StrEqual(parts[i], "survive") && !StrEqual(parts[i], "headshot") && !StrEqual(parts[i], "noreload"))
 		{
 			strcopy(weapon, maxlen, parts[i]);
 			StringToLower(weapon);
@@ -1394,27 +1527,24 @@ public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 
 public void Event_WeaponReload(Event event, const char[] name, bool dontBroadcast)
 {
-	int client = GetClientOfUserId(event.GetInt("userid"));
-	
-	// Check if valid non-bot player
-	if (IsValidClient(client) && !IsFakeClient(client))
-	{
-		// Iterate through all tasks
-		for (int i = 0; i < g_Tasks.Length; i++)
-		{
-			AchievementTask task;
-			g_Tasks.GetArray(i, task, sizeof(task));
-			
-			if (!task.Completed)
-			{
-				if (StrEqual(task.TaskType, "killnoreload"))
-				{
-					task.CurrentProgress = 0;
-					g_Tasks.SetArray(i, task, sizeof(task));
-				}
-			}
-		}
-	}
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    if (IsValidClient(client) && !IsFakeClient(client))
+        OnPlayerReload();
+}
+
+void OnPlayerReload()
+{
+    for (int i = 0; i < g_Tasks.Length; i++)
+    {
+        AchievementTask task;
+        g_Tasks.GetArray(i, task, sizeof(task));
+
+        if (!task.Completed && task.RequireNoReload)
+        {
+            task.CurrentProgress = 0;
+            g_Tasks.SetArray(i, task, sizeof(task));
+        }
+    }
 }
 
 public void Event_PlayerBlind(Event event, const char[] name, bool dontBroadcast)
@@ -1482,6 +1612,7 @@ public void Event_BombDefused(Event event, const char[] name, bool dontBroadcast
 
 public void ShowTaskList()
 {
+	ClearChat();
 	// Show task list for all players in the chat
 	for (int i = 1; i <= MaxClients; i++)
 		if (IsValidClient(i))
@@ -1504,6 +1635,7 @@ public void ShowTaskProgress(AchievementTask task)
 
 public Action Command_ListTasks(int client, int args)
 {
+	ClearChat();
 	// If command from server, show to all clients
 	if (client == 0)
 	{
@@ -1608,6 +1740,20 @@ public int CountAlivePlayers()
 	
 	return i;
 }
+
+public int CountDeadPlayers()
+{
+	int i = 0;
+	
+	for (int client = 1; client <= MaxClients; client++)
+	{
+		if (IsValidClient(client) && !IsPlayerAlive(client))
+			i++;
+	}
+	
+	return i;
+}
+
 
 public int CountEnemyTeam()
 {
@@ -1740,13 +1886,13 @@ public Action Command_Autobuy(int client, int args)
 		return Plugin_Continue;
 	}
 	
-	// Get all active killwith weapons
+	// Get all active killwith / damagewith weapons
 	ArrayList weapons = new ArrayList(32);
 	for (int i = 0; i < g_Tasks.Length; i++)
 	{
 		AchievementTask task;
 		g_Tasks.GetArray(i, task, sizeof(task));
-		if (StrEqual(task.TaskType, "killwith") && !task.Completed)
+		if ((StrEqual(task.TaskType, "killwith") || StrEqual(task.TaskType, "damagewith")) && !task.Completed)
 			weapons.PushString(task.Weapon);
 		else if (StrEqual(task.TaskType, "killblind") && !task.Completed)
 			weapons.PushString("flashbang");
@@ -2085,6 +2231,31 @@ public Action Timer_GiveC4ToHuman(Handle timer)
 	return Plugin_Stop;
 }
 
+public Action Timer_CheckClip(Handle timer)
+{
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!IsValidClient(client) || !IsPlayerAlive(client))
+            continue;
+
+        int weapon = GetEntPropEnt(client, Prop_Data, "m_hActiveWeapon");
+        if (weapon == -1 || !IsValidEntity(weapon))
+        {
+            g_iLastClip[client] = -1;
+            continue;
+        }
+
+        int clip = GetEntProp(weapon, Prop_Send, "m_iClip1");
+
+        // Auto reload
+        if (g_iLastClip[client] > 0 && clip == 0)
+            OnPlayerReload();
+
+        g_iLastClip[client] = clip;
+    }
+    return Plugin_Continue;
+}
+
 void RemoveAllC4()
 {
 	int weapon;
@@ -2141,6 +2312,28 @@ bool IsSilenced(int client)
 	return false;
 }
 
+bool IsTrophyWeapon(const char[] weapon)
+{
+    if (IsHumanTeamCT())
+    {
+        return  StrEqual(weapon, "elite")  ||
+                StrEqual(weapon, "mac10")  ||
+                StrEqual(weapon, "galil")  ||
+                StrEqual(weapon, "ak47")   ||
+                StrEqual(weapon, "sg552")  ||
+                StrEqual(weapon, "g3sg1");
+    }
+    else
+    {
+        return  StrEqual(weapon, "fiveseven") ||
+                StrEqual(weapon, "tmp")       ||
+                StrEqual(weapon, "famas")     ||
+                StrEqual(weapon, "m4a1")      ||
+                StrEqual(weapon, "aug")       ||
+                StrEqual(weapon, "sg550");
+    }
+}
+
 bool IsInAir(int client)
 {
 	return !(GetEntityFlags(client) & FL_ONGROUND);
@@ -2167,6 +2360,11 @@ bool IsNewWeapon(int client)
 void ResetWeapons()
 {
 	g_UsedWeapons.Clear();
+}
+
+void ClearChat()
+{
+	PrintToChatAll(" \n \n \n \n \n \n \n \n");
 }
 
 public Action:PlayerSpray(const String:szTempEntName[], const arrClients[], iClientCount, Float:flDelay) 

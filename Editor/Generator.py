@@ -62,18 +62,17 @@ def process_txt_files():
                 opponents_num = random.randint(3, 10)
                 teammates_num = opponents_num - random.randint(1, 3)
                 
-                # Select random options
-                task1 = random.choice(TASK1_OPTIONS)
-                task2 = random.choice(TASK2_OPTIONS)
-                task3 = random.choice(TASK3_OPTIONS)
-                
-                # Write to cfg file
+                # Write random tasks to cfg file
                 with open(cfg_file, 'w') as cfg_f:
                     cfg_f.write(f"cz_opponents {opponents_num}\n")
                     cfg_f.write(f"cz_teammates {teammates_num}\n\n")
-                    cfg_f.write(f"{task1}\n")
-                    cfg_f.write(f"{task2}\n")
-                    cfg_f.write(f"{task3}\n")
+                    if (line.startswith("cs_") or line.startswith("de_")):
+                        cfg_f.write(f"{random.choice(TASK1_OPTIONS)}\n")
+                        cfg_f.write(f"{random.choice(TASK2_OPTIONS)}\n")
+                        cfg_f.write(f"{random.choice(TASK3_OPTIONS)}\n")
+                    else:
+                        cfg_f.write(f"{random.choice(TASK1_OPTIONS[:2])}\n")
+                        cfg_f.write(f"{random.choice(TASK3_OPTIONS[:2])}\n")
                 
                 macycle_lines.append(line)
             
