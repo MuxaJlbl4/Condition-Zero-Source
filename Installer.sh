@@ -37,7 +37,7 @@ BASENAME="$(basename "$INSTALL_DIR")"
 
 if [ "$BASENAME" != "cstrike" ]; then
     print_error "The target folder must be named 'cstrike', got '$BASENAME' instead."
-    echo "Example: $0 /home/user/.local/share/Steam/steamapps/common/Counter-Strike Source/cstrike/"
+    echo "Example: $0 \"/home/user/.local/share/Steam/steamapps/common/Counter-Strike Source/cstrike/\""
     exit 1
 fi
 

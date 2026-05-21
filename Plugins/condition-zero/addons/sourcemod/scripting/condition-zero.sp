@@ -3,7 +3,7 @@
 #include <sdktools>
 #include <clientprefs>
 
-#define PLUGIN_VERSION		"1.1-RC"
+#define PLUGIN_VERSION		"1.1"
 
 #define MISSION_COMPLETE	"music/thinice_success.mp3"
 #define MISSION_FAILED		"music/train_failure.mp3"
@@ -13,9 +13,9 @@
 
 public Plugin myinfo = 
 {
-	name = "Condition Zero Source",
+	name = "Condition Zero: Source",
 	author = "MuLLlaH9!",
-	description = "Task-tracking gameplay port from Counter-Strike: Condition Zero",
+	description = "Task-tracking gameplay from Counter-Strike: Condition Zero",
 	version = PLUGIN_VERSION,
 	url = "https://github.com/MuxaJlbl4/Condition-Zero-Source"
 };
@@ -38,7 +38,7 @@ bool g_bBlinded[MAXPLAYERS+1], g_bUseOriginalAutobuy;
 int g_TotalHostages, g_HostagesRescuedThisRound;
 int g_iLastClip[MAXPLAYERS+1];
 ArrayList g_Tasks, g_hFollowedHostages, g_UsedWeapons;
-ConVar g_cvHumanTeam, g_cvMatchwins, g_cvMatchwinsby, g_cvFreezeTime, g_cvBotDifficulty, g_cvTeamChosen, g_cvSimpleCoop, g_cvHostname, g_cvTeammates, g_cvOpponents, g_cvBotsPerPlayer, g_cvBotQuota, g_cvCheats;
+ConVar g_cvHumanTeam, g_cvMatchwins, g_cvMatchwinsby, g_cvFreezeTime, g_cvBotDifficulty, g_cvTeamChosen, g_cvSimpleCoop, g_cvSimpleHegren, g_cvHostname, g_cvTeammates, g_cvOpponents, g_cvBotsPerPlayer, g_cvBotQuota, g_cvCheats;
 
 public OnPluginStart()
 {
@@ -50,6 +50,7 @@ public OnPluginStart()
 	g_cvMatchwinsby = CreateConVar("cz_matchwinsby", "2", "The number of wins a team must lead by in order to win a match");
 	g_cvTeamChosen = CreateConVar("cz_teamchosen", "0", "Is team and difficulty already chosen for this session");
 	g_cvSimpleCoop = CreateConVar("cz_simple_coop", "1", "Simplified survival and in-a-row tasks for coop");
+	g_cvSimpleHegren = CreateConVar("cz_simple_hegren", "1", "Increases max grenade count in inventory for missions with hegrenade task");
 	g_cvHumanTeam = FindConVar("mp_humanteam");
 	g_cvFreezeTime = FindConVar("mp_freezetime");
 	g_cvHostname = FindConVar("hostname"); // Used for campaign name transmission from BonusMapDialog
@@ -312,6 +313,9 @@ public void OnMapStart()
 	
 	// Delete old tasks
 	Command_DeleteAllTasks(0, 0);
+	
+	// Reset hegrenade limits
+	ServerCommand("ammo_hegrenade_max 1");
 	
 	// Auto reload tracking:
 	static Handle s_hClipTimer;
@@ -688,10 +692,10 @@ public Action Command_AddTask(int client, int args)
 		StrEqual(type, "killtrophy") || 
 		StrEqual(type, "damage"))
 		{
-			task.TargetValue     = ParseTargetValue(buffer);
+			task.TargetValue = ParseTargetValue(buffer);
 			task.RequireHeadshot = StrContains(buffer, "headshot") != -1;
-			task.WithoutDying    = StrContains(buffer, "inarow")   != -1;
-			task.RequireSurvival = StrContains(buffer, "survive")  != -1;
+			task.WithoutDying = StrContains(buffer, "inarow") != -1;
+			task.RequireSurvival = StrContains(buffer, "survive") != -1;
 			task.RequireNoReload = StrContains(buffer, "noreload") != -1;
 		}
 		// killwith
@@ -706,15 +710,17 @@ public Action Command_AddTask(int client, int args)
 				return Plugin_Handled;
 			}
 			task.RequireHeadshot = StrContains(buffer, "headshot") != -1;
-			task.WithoutDying    = StrContains(buffer, "inarow")   != -1;
-			task.RequireSurvival = StrContains(buffer, "survive")  != -1;
+			task.WithoutDying = StrContains(buffer, "inarow") != -1;
+			task.RequireSurvival = StrContains(buffer, "survive") != -1;
 			task.RequireNoReload = StrContains(buffer, "noreload") != -1;
 			if (StrEqual(task.Weapon, "knife", false) || StrEqual(task.Weapon, "hegrenade", false))
 				task.RequireHeadshot = false;
+			if (g_cvSimpleHegren.IntValue && StrEqual(task.Weapon, "hegrenade", false))
+				ServerCommand("ammo_hegrenade_max 2");
 		}
 		else if (StrEqual(type, "winfast"))
 		{
-			task.TargetValue     = ParseTargetValue(buffer);
+			task.TargetValue = ParseTargetValue(buffer);
 			task.RequireSurvival = StrContains(buffer, "survive") != -1;
 		}
 		else if (StrEqual(type, "rescue"))
@@ -758,22 +764,38 @@ public Action Command_AddTask(int client, int args)
 
 bool IsValidWeaponArg(const char[] weapon)
 {
-	return  StrEqual(weapon, "glock")      || StrEqual(weapon, "usp")       ||
-	        StrEqual(weapon, "p228")       || StrEqual(weapon, "deagle")     ||
-	        StrEqual(weapon, "elite")      || StrEqual(weapon, "fiveseven")  ||
-	        StrEqual(weapon, "m3")         || StrEqual(weapon, "xm1014")     ||
-	        StrEqual(weapon, "galil")      || StrEqual(weapon, "ak47")       ||
-	        StrEqual(weapon, "scout")      || StrEqual(weapon, "sg552")      ||
-	        StrEqual(weapon, "awp")        || StrEqual(weapon, "g3sg1")      ||
-	        StrEqual(weapon, "famas")      || StrEqual(weapon, "m4a1")       ||
-	        StrEqual(weapon, "aug")        || StrEqual(weapon, "sg550")      ||
-	        StrEqual(weapon, "mac10")      || StrEqual(weapon, "tmp")        ||
-	        StrEqual(weapon, "mp5navy")    || StrEqual(weapon, "ump45")      ||
-	        StrEqual(weapon, "p90")        || StrEqual(weapon, "m249")       ||
-	        StrEqual(weapon, "hegrenade")  || StrEqual(weapon, "knife")      ||
-	        StrEqual(weapon, "pistol")     || StrEqual(weapon, "shotgun")    ||
-	        StrEqual(weapon, "smg")        || StrEqual(weapon, "rifle")      ||
-	        StrEqual(weapon, "sniper")     || StrEqual(weapon, "machinegun");
+	return	StrEqual(weapon, "glock") ||
+			StrEqual(weapon, "usp") ||
+			StrEqual(weapon, "p228") ||
+			StrEqual(weapon, "deagle") ||
+			StrEqual(weapon, "elite") ||
+			StrEqual(weapon, "fiveseven") ||
+			StrEqual(weapon, "m3") ||
+			StrEqual(weapon, "xm1014") ||
+			StrEqual(weapon, "galil") ||
+			StrEqual(weapon, "ak47") ||
+			StrEqual(weapon, "scout") ||
+			StrEqual(weapon, "sg552") ||
+			StrEqual(weapon, "awp") ||
+			StrEqual(weapon, "g3sg1") ||
+			StrEqual(weapon, "famas") ||
+			StrEqual(weapon, "m4a1") ||
+			StrEqual(weapon, "aug") ||
+			StrEqual(weapon, "sg550") ||
+			StrEqual(weapon, "mac10") ||
+			StrEqual(weapon, "tmp") ||
+			StrEqual(weapon, "mp5navy") ||
+			StrEqual(weapon, "ump45") ||
+			StrEqual(weapon, "p90") ||
+			StrEqual(weapon, "m249") ||
+			StrEqual(weapon, "hegrenade") ||
+			StrEqual(weapon, "knife") ||
+			StrEqual(weapon, "pistol") ||
+			StrEqual(weapon, "shotgun") ||
+			StrEqual(weapon, "smg") ||
+			StrEqual(weapon, "rifle") ||
+			StrEqual(weapon, "sniper") ||
+			StrEqual(weapon, "machinegun");
 }
 
 public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
@@ -906,7 +928,7 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 public void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
 {
 	int attacker = GetClientOfUserId(event.GetInt("attacker"));
-	int victim   = GetClientOfUserId(event.GetInt("userid"));
+	int victim = GetClientOfUserId(event.GetInt("userid"));
 	
 	if (!IsValidClient(attacker))
 		return;
@@ -1162,7 +1184,7 @@ public void GetTaskDescription(const AchievementTask task, char[] buffer, int ma
 			task.TargetValue != 1 ? "ies" : "y",
 			task.RequireHeadshot ? " with headshot" : "",
 			task.RequireHeadshot && task.TargetValue != 1 ? "s" : "",
-			task.WithoutDying    ? " without dying"     : "",
+			task.WithoutDying ? " without dying" : "",
 			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
@@ -1181,7 +1203,7 @@ public void GetTaskDescription(const AchievementTask task, char[] buffer, int ma
 			weaponName,
 			task.RequireHeadshot ? " with headshot" : "",
 			task.RequireHeadshot && task.TargetValue != 1 ? "s" : "",
-			task.WithoutDying    ? " without dying"     : "",
+			task.WithoutDying ? " without dying" : "",
 			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
@@ -1196,7 +1218,7 @@ public void GetTaskDescription(const AchievementTask task, char[] buffer, int ma
 			task.TargetValue != 1 ? "ies" : "y",
 			task.RequireHeadshot ? " with headshot" : "",
 			task.RequireHeadshot && task.TargetValue != 1 ? "s" : "",
-			task.WithoutDying    ? " without dying"     : "",
+			task.WithoutDying ? " without dying" : "",
 			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
@@ -1211,7 +1233,7 @@ public void GetTaskDescription(const AchievementTask task, char[] buffer, int ma
 			task.TargetValue != 1 ? "ies" : "y",
 			task.RequireHeadshot ? " with headshot" : "",
 			task.RequireHeadshot && task.TargetValue != 1 ? "s" : "",
-			task.WithoutDying    ? " without dying"     : "",
+			task.WithoutDying ? " without dying" : "",
 			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
@@ -1226,7 +1248,7 @@ public void GetTaskDescription(const AchievementTask task, char[] buffer, int ma
 			task.TargetValue != 1 ? "ies" : "y",
 			task.RequireHeadshot ? " with headshot" : "",
 			task.RequireHeadshot && task.TargetValue != 1 ? "s" : "",
-			task.WithoutDying    ? " without dying"     : "",
+			task.WithoutDying ? " without dying" : "",
 			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
@@ -1241,7 +1263,7 @@ public void GetTaskDescription(const AchievementTask task, char[] buffer, int ma
 			task.TargetValue != 1 ? "ies" : "y",
 			task.RequireHeadshot ? " with headshot" : "",
 			task.RequireHeadshot && task.TargetValue != 1 ? "s" : "",
-			task.WithoutDying    ? " without dying"     : "",
+			task.WithoutDying ? " without dying" : "",
 			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
@@ -1257,7 +1279,7 @@ public void GetTaskDescription(const AchievementTask task, char[] buffer, int ma
 			task.RequireHeadshot ? " with headshot" : "",
 			task.RequireHeadshot && task.TargetValue != 1 ? "s" : "",
 			task.RequireHeadshot && task.TargetValue != 1 ? "s" : "",
-			task.WithoutDying    ? " without dying"     : "",
+			task.WithoutDying ? " without dying" : "",
 			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
@@ -1270,8 +1292,8 @@ public void GetTaskDescription(const AchievementTask task, char[] buffer, int ma
 		Format(buffer, maxlen, "Kill %d enem%s with enemy's exclusive weapon%s%s%s%s %s%s%s%s",
 			task.TargetValue,
 			task.TargetValue != 1 ? "ies" : "y",
-			task.RequireHeadshot ? " with headshots"    : "",
-			task.WithoutDying    ? " without dying"     : "",
+			task.RequireHeadshot ? " with headshots" : "",
+			task.WithoutDying ? " without dying" : "",
 			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
@@ -1281,13 +1303,12 @@ public void GetTaskDescription(const AchievementTask task, char[] buffer, int ma
 	}
 	else if (StrEqual(task.TaskType, "damage"))
 	{
-		Format(buffer, maxlen, "Deal %d damage to enemies%s%s%s%s%s %s%s%s%s",
+		Format(buffer, maxlen, "Deal %d damage to enemies%s%s%s%s %s%s%s%s",
 			task.TargetValue,
-			task.RequireHeadshot ? " with headshots"    : "",
-			task.WithoutDying    ? " without dying"     : "",
+			task.RequireHeadshot ? " with headshots" : "",
+			task.WithoutDying ? " without dying" : "",
 			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
-			"",   // placeholder keeps arg count consistent
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
 			!task.Completed && task.CurrentProgress > 0 ? FormatNumber(task.CurrentProgress) : "",
 			!task.Completed && task.CurrentProgress > 0 ? "]" : "",
@@ -1298,13 +1319,12 @@ public void GetTaskDescription(const AchievementTask task, char[] buffer, int ma
 		char weaponName[32];
 		GetFormattedWeaponName(task.Weapon, weaponName, sizeof(weaponName));
 		
-		Format(buffer, maxlen, "Deal %d damage to enemies with %s%s%s%s%s %s%s%s%s",
+		Format(buffer, maxlen, "Deal %d damage to enemies with %s%s%s%s %s%s%s%s",
 			task.TargetValue,
 			weaponName,
-			task.WithoutDying    ? " without dying"     : "",
+			task.WithoutDying ? " without dying" : "",
 			task.RequireNoReload ? " without reloading" : "",
 			task.RequireSurvival ? " and survive the round" : "",
-			"",   // placeholder
 			!task.Completed && task.CurrentProgress > 0 ? "[" : "",
 			!task.Completed && task.CurrentProgress > 0 ? FormatNumber(task.CurrentProgress) : "",
 			!task.Completed && task.CurrentProgress > 0 ? "]" : "",
@@ -1526,24 +1546,24 @@ public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 
 public void Event_WeaponReload(Event event, const char[] name, bool dontBroadcast)
 {
-    int client = GetClientOfUserId(event.GetInt("userid"));
-    if (IsValidClient(client) && !IsFakeClient(client))
-        OnPlayerReload();
+	int client = GetClientOfUserId(event.GetInt("userid"));
+	if (IsValidClient(client) && !IsFakeClient(client))
+		OnPlayerReload();
 }
 
 void OnPlayerReload()
 {
-    for (int i = 0; i < g_Tasks.Length; i++)
-    {
-        AchievementTask task;
-        g_Tasks.GetArray(i, task, sizeof(task));
+	for (int i = 0; i < g_Tasks.Length; i++)
+	{
+		AchievementTask task;
+		g_Tasks.GetArray(i, task, sizeof(task));
 
-        if (!task.Completed && task.RequireNoReload)
-        {
-            task.CurrentProgress = 0;
-            g_Tasks.SetArray(i, task, sizeof(task));
-        }
-    }
+		if (!task.Completed && task.RequireNoReload)
+		{
+			task.CurrentProgress = 0;
+			g_Tasks.SetArray(i, task, sizeof(task));
+		}
+	}
 }
 
 public void Event_PlayerBlind(Event event, const char[] name, bool dontBroadcast)
@@ -2013,7 +2033,11 @@ void BuyWeapons(int client, ArrayList weapons)
 		else if (IsGrenade(weapon))
 		{
 			if (StrEqual(weapon, "hegrenade") && money >= GetPrice("hegrenade"))
+			{
 				FakeClientCommand(client, "buy hegrenade");
+				if (g_cvSimpleHegren.IntValue && money >= GetPrice("hegrenade"))
+					FakeClientCommand(client, "buy hegrenade");
+			}
 			if (StrEqual(weapon, "flashbang") && money >= GetPrice("flashbang"))
 			{
 				FakeClientCommand(client, "buy flashbang");
@@ -2232,27 +2256,27 @@ public Action Timer_GiveC4ToHuman(Handle timer)
 
 public Action Timer_CheckClip(Handle timer)
 {
-    for (int client = 1; client <= MaxClients; client++)
-    {
-        if (!IsValidClient(client) || !IsPlayerAlive(client))
-            continue;
+	for (int client = 1; client <= MaxClients; client++)
+	{
+		if (!IsValidClient(client) || !IsPlayerAlive(client))
+			continue;
 
-        int weapon = GetEntPropEnt(client, Prop_Data, "m_hActiveWeapon");
-        if (weapon == -1 || !IsValidEntity(weapon))
-        {
-            g_iLastClip[client] = -1;
-            continue;
-        }
+		int weapon = GetEntPropEnt(client, Prop_Data, "m_hActiveWeapon");
+		if (weapon == -1 || !IsValidEntity(weapon))
+		{
+			g_iLastClip[client] = -1;
+			continue;
+		}
 
-        int clip = GetEntProp(weapon, Prop_Send, "m_iClip1");
+		int clip = GetEntProp(weapon, Prop_Send, "m_iClip1");
 
-        // Auto reload
-        if (g_iLastClip[client] > 0 && clip == 0)
-            OnPlayerReload();
+		// Auto reload
+		if (g_iLastClip[client] > 0 && clip == 0)
+			OnPlayerReload();
 
-        g_iLastClip[client] = clip;
-    }
-    return Plugin_Continue;
+		g_iLastClip[client] = clip;
+	}
+	return Plugin_Continue;
 }
 
 void RemoveAllC4()
@@ -2313,24 +2337,24 @@ bool IsSilenced(int client)
 
 bool IsTrophyWeapon(const char[] weapon)
 {
-    if (IsHumanTeamCT())
-    {
-        return  StrEqual(weapon, "elite")  ||
-                StrEqual(weapon, "mac10")  ||
-                StrEqual(weapon, "galil")  ||
-                StrEqual(weapon, "ak47")   ||
-                StrEqual(weapon, "sg552")  ||
-                StrEqual(weapon, "g3sg1");
-    }
-    else
-    {
-        return  StrEqual(weapon, "fiveseven") ||
-                StrEqual(weapon, "tmp")       ||
-                StrEqual(weapon, "famas")     ||
-                StrEqual(weapon, "m4a1")      ||
-                StrEqual(weapon, "aug")       ||
-                StrEqual(weapon, "sg550");
-    }
+	if (IsHumanTeamCT())
+	{
+		return	StrEqual(weapon, "elite") ||
+				StrEqual(weapon, "mac10") ||
+				StrEqual(weapon, "galil") ||
+				StrEqual(weapon, "ak47") ||
+				StrEqual(weapon, "sg552") ||
+				StrEqual(weapon, "g3sg1");
+	}
+	else
+	{
+		return	StrEqual(weapon, "fiveseven") ||
+				StrEqual(weapon, "tmp") ||
+				StrEqual(weapon, "famas") ||
+				StrEqual(weapon, "m4a1") ||
+				StrEqual(weapon, "aug") ||
+				StrEqual(weapon, "sg550");
+	}
 }
 
 bool IsInAir(int client)
